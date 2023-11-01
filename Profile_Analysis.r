@@ -1,20 +1,24 @@
 
 #Loading the CSV file
-my_data = read.csv("~/Desktop/ds_dataset/DSC_Project/ias-profile.csv")
-head(my_data)
-View(my_data)
+profile_data = read.csv("ias-profile.csv")
+head(profile_data)
+View(profile_data)
 
 
 #Dropping cloumns
-my_data <- subset(my_data, select = -c(ID,Name,Source_of_Recruitment,Retired,Last_Education_Subject,Last_Education_Division))
-my_data <- subset(my_data, select = -c(Last_Designation,Last_Level,Last_Office,Last_Field_of_Experience,Last_Category_of_Experience,Source,Gender_Source))
-View(my_data)
+profile_data <- subset(profile_data, select = -c(ID,Name,Source_of_Recruitment,Retired,Last_Education_Subject,Last_Education_Division))
+profile_data <- subset(profile_data, select = -c(Last_Designation,Last_Level,Last_Office,Last_Field_of_Experience,Last_Category_of_Experience,Source,Gender_Source))
+View(profile_data)
+
+#find median dates for all columns and replace NA with median dates
+median_allotment_year <- median(profile_data$Allotment_Year, na.rm = TRUE)
+profile_data$Allotment_Year[is.na(profile_data$Allotment_Year)] <- median_allotment_year
+
 
 #First Copy of the data
-data1 <- subset(my_data)
-data1 <- na.omit(my_data)
+data1 <- subset(profile_data)
+data1 <- na.omit(profile_data)
 head(data1)
-
 
 #Figuring out the genders of the bureaucrats
 gender_counts <- table(data1$Gender)
@@ -25,6 +29,18 @@ barplot(gender_counts,
         ylab = "Count",
         col = c("blue", "pink"), # Specify colors for bars
         legend.text = rownames(gender_counts)) # Add legend
+# Replace NA or empty "Languages Known" with "Mother Tongue" if "Mother Tongue" exists
+profile_data$Languages_Known <- ifelse(is.na(profile_data$Languages_Known) | profile_data$Languages_Known == "",
+                                       ifelse(!is.na(profile_data$Mother_Tongue) & profile_data$Mother_Tongue != "" & profile_data$Mother_Tongue != "N.A." & profile_data$Mother_Tongue != "-", 
+                                              profile_data$Mother_Tongue, 
+                                              profile_data$Languages_Known),
+                                       profile_data$Languages_Known)
+# Filter out the empty values and calculate the mode
+mode_languages_known <- as.character(names(sort(table(profile_data$Languages_Known[profile_data$Languages_Known != "" ]), decreasing = TRUE)[1]))
+
+# Replace empty values with the calculated mode value
+profile_data$Languages_Known[profile_data$Languages_Known == ""] <- mode_languages_known
+profile_data$Languages_Known[profile_data$Languages_Known == "N.A."] <- mode_languages_known
 
 
 
@@ -151,7 +167,7 @@ for (i in 1:nrow(cadre_female_ratio)) {
     colors <- rainbow(length(labels))
     pie(counts, labels = paste(labels, "(", round(counts / sum(counts) * 100, 1), "%)"), col = colors, main = paste("Ratio of Female Employees in", cadre_name))
     #if (i < nrow(cadre_female_ratio)) {
-      #dev.new()
+    #dev.new()
     #}
   }
 }
@@ -164,7 +180,7 @@ print(cadre_female_ratio)
 
 
 #Second Copy of the data
-profile_data <- subset(my_data)
+profile_data <- subset(profile_data)
 head(profile_data)
 
 
@@ -322,16 +338,16 @@ print(chi_square_test)
 
 
 #Figuring out the realtionship between gender and last designation held
-my_data2 = read.csv("~/Desktop/ds_dataset/ias-profile.csv")
-head(my_data2)
+profile_data2 = read.csv("D:/School/College/Books-20210104T150531Z-001/Books/Sem 7/DSC/Project/ias-profile.csv")
+head(profile_data2)
 #Dropping cloumns
-my_data2 <- subset(my_data, select = -c(ID,Name,Source_of_Recruitment,Retired,Last_Education_Subject,Last_Education_Division))
-my_data2 <- subset(my_data, select = -c(Last_Office,Last_Field_of_Experience,Last_Category_of_Experience,Source,Gender_Source))
-View(my_data2)
+profile_data2 <- subset(profile_data, select = -c(ID,Name,Source_of_Recruitment,Retired,Last_Education_Subject,Last_Education_Division))
+profile_data2 <- subset(profile_data, select = -c(Last_Office,Last_Field_of_Experience,Last_Category_of_Experience,Source,Gender_Source))
+View(profile_data2)
 
 #Third Copy of the data
-data3 <- subset(my_data2)
-data3 <- na.omit(my_data2)
+data3 <- subset(profile_data2)
+data3 <- na.omit(profile_data2)
 head(data3)
 View(data3)
 
@@ -348,26 +364,53 @@ summary(multinom_model)
 
 
 
+# Loading the CSV file
+my_data2 = read.csv("D:/School/College/Books-20210104T150531Z-001/Books/Sem 7/DSC/Project/ias-profile.csv")
+head(my_data2)
+
+# Dropping columns
+my_data2 <- subset(my_data2, select = -c(ID, Name, Source_of_Recruitment, Retired, Last_Education_Subject, Last_Education_Division))
+my_data2 <- subset(my_data2, select = -c(Last_Office, Last_Field_of_Experience, Last_Category_of_Experience, Source, Gender_Source))
+View(my_data2)
+
+# Third Copy of the data
+data3 <- subset(my_data2, select = -c(Languages_Known, Date_of_Birth, Date_of_Joining, Retirement_Reason, Last_Education_Qualification, Last_Designation, Last_Level, Last_Start_Date, Last_End_Date))
+data3 <- na.omit(data3)
+data3 <- data3[complete.cases(data3)]
+data3 <- data3[!(apply(data3, 1, function(row) any(row == '-' | row == 'N.A.'))), ]
+head(data3)
+View(data3)
+
+# Load the necessary libraries
+install.packages("rpart")
+library(rpart)
+library(rpart.plot)
 
 
+# Sample 150 rows randomly from your dataset
+set.seed(123)  # For reproducibility
+sampled_data <- data3[sample(nrow(data3), 300), ] #training only on 300 rows
 
+# Fit a decision tree model on the sampled data
+model <- rpart(Cadre ~ ., data = data3, method ="class")
 
+# Print a summary of the model
+summary(model)
 
+# Plot the decision tree
+rpart.plot(model, extra = 1)  # Use 'extra = 1' to display summary information on the nodes
 
+# Print a summary of the model
+summary(model)
 
+# Make predictions on new data
+new_data_point <- data.frame(
+  Place_of_Domicile = "Gujarat",
+  Allotment_Year = 1953,
+  Gender="Male",
+  Mother_Tongue = "Gujarati"
+)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Predict the Cadre using type = "class"
+predicted_cadre <- predict(model, new_data_point, type = "class")
+predicted_cadre
